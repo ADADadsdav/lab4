@@ -112,6 +112,198 @@ Docker-ресурсы лабораторной изолированы: испо�
 
 Перед защищёнными запросами в Swagger UI выполните `/auth/login`. Браузер сохранит HttpOnly Cookies, после чего можно проверять `/auth/whoami` и CRUD фильмов. Без авторизации защищённые методы должны возвращать `401`.
 
+## Технический стек
+
+- Python 3.13;
+- Django 6.0.3;
+- Django REST Framework 3.16.1;
+- drf-spectacular 0.30.0 для автоматической OpenAPI-документации;
+- PostgreSQL 16;
+- PyJWT для JWT;
+- bcrypt для хеширования паролей;
+- requests для OAuth 2.0 через Яндекс;
+- Docker и Docker Compose;
+- Swagger UI для интерактивной проверки API.
+
+## Проверка API через cURL
+
+Команды выполняются после запуска приложения. Для Linux/macOS используйте Bash, для Windows удобнее выполнять команды в Git Bash.
+
+### Регистрация
+
+```bash
+curl -X POST http://localhost:4200/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "username": "testuser",
+    "password": "SecurePass123",
+    "confirm_password": "SecurePass123"
+  }'
+```
+
+### Вход в систему
+
+Сохраните Cookies, чтобы использовать их в защищённых запросах:
+
+```bash
+curl -X POST http://localhost:4200/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "identifier": "user@example.com",
+    "password": "SecurePass123"
+  }' \
+  -c cookies.txt
+```
+
+### Проверка текущего пользователя
+
+```bash
+curl -i http://localhost:4200/auth/whoami \
+  -b cookies.txt
+```
+
+Ожидаемый ответ: `200 OK`.
+
+### Проверка защищённого endpoint без авторизации
+
+```bash
+curl -i http://localhost:4200/api/movies/
+```
+
+Ожидаемый ответ: `401 Unauthorized`.
+
+### Получение списка фильмов
+
+```bash
+curl -i "http://localhost:4200/api/movies/?page=1&limit=10" \
+  -b cookies.txt
+```
+
+### Создание фильма с авторизацией
+
+```bash
+curl -X POST http://localhost:4200/api/movies/ \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "title": "Начало",
+    "director": "Кристофер Нолан",
+    "year": 2010
+  }'
+```
+
+Скопируйте `id` из ответа и замените `MOVIE_ID` в следующих командах.
+
+### Получение фильма по ID
+
+```bash
+curl -i http://localhost:4200/api/movies/MOVIE_ID/ \
+  -b cookies.txt
+```
+
+### Полное обновление фильма — PUT
+
+```bash
+curl -X PUT http://localhost:4200/api/movies/MOVIE_ID/ \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "title": "Интерстеллар",
+    "director": "Кристофер Нолан",
+    "year": 2014
+  }'
+```
+
+### Частичное обновление фильма — PATCH
+
+```bash
+curl -X PATCH http://localhost:4200/api/movies/MOVIE_ID/ \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{"title": "Интерстеллар: обновлено"}'
+```
+
+### Мягкое удаление фильма — DELETE
+
+```bash
+curl -i -X DELETE http://localhost:4200/api/movies/MOVIE_ID/ \
+  -b cookies.txt
+```
+
+Ожидаемый ответ: `204 No Content`.
+
+### Обновление пары токенов — Refresh
+
+```bash
+curl -i -X POST http://localhost:4200/auth/refresh \
+  -b cookies.txt \
+  -c cookies.txt
+```
+
+### Выход из текущей сессии — Logout
+
+```bash
+curl -i -X POST http://localhost:4200/auth/logout \
+  -b cookies.txt \
+  -c cookies.txt
+```
+
+### Выход из всех сессий — Logout All
+
+Сначала выполните вход ещё раз:
+
+```bash
+curl -i -X POST http://localhost:4200/auth/logout-all \
+  -b cookies.txt \
+  -c cookies.txt
+```
+
+### Вход через Яндекс OAuth 2.0
+
+Откройте в браузере:
+
+```text
+http://localhost:4200/auth/oauth/yandex
+```
+
+Для работы нужны реальные `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET` и callback URL в `.env`.
+
+### Запрос сброса пароля
+
+```bash
+curl -X POST http://localhost:4200/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+```
+
+В development токен выводится в консоль приложения.
+
+### Установка нового пароля
+
+Замените `TOKEN_FROM_APPLICATION_CONSOLE` на токен из консоли:
+
+```bash
+curl -X POST http://localhost:4200/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "TOKEN_FROM_APPLICATION_CONSOLE",
+    "new_password": "AnotherPass123",
+    "confirm_password": "AnotherPass123"
+  }'
+```
+
+## Автоматические проверки проекта
+
+```powershell
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
+.\.venv\Scripts\python.exe manage.py spectacular --file schema.yml --validate
+.\.venv\Scripts\python.exe manage.py test
+```
+
+Проверяются регистрация, вход, Cookies, `/whoami`, ответы `401` и `403`, создание и владение фильмами, logout, OAuth `state`, соли паролей и токенов, сброс пароля и валидность OpenAPI-схемы.
+
 ## Структура
 
 ```text
