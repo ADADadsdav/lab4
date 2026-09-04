@@ -1,9 +1,12 @@
 import requests
 import secrets
+import logging
 from urllib.parse import urlencode
 from django.conf import settings
 from users.models import User
 from .auth_service import AuthService
+
+logger = logging.getLogger(__name__)
 
 
 class OAuthService:
@@ -37,11 +40,13 @@ class OAuthService:
 
         response = requests.post(
             'https://oauth.yandex.ru/token',
-            data=data
+            data=data,
+            timeout=10,
         )
 
         if response.status_code != 200:
-            raise Exception(f'Ошибка обмена кода на токен: {response.text}')
+            logger.warning('Yandex token exchange failed with status %s', response.status_code)
+            raise RuntimeError('Не удалось получить токен Яндекса')
 
         return response.json()
 
@@ -52,11 +57,13 @@ class OAuthService:
         response = requests.get(
             'https://login.yandex.ru/info',
             headers=headers,
-            params={'format': 'json'}
+            params={'format': 'json'},
+            timeout=10,
         )
 
         if response.status_code != 200:
-            raise Exception(f'Ошибка получения информации о пользователе: {response.text}')
+            logger.warning('Yandex user info request failed with status %s', response.status_code)
+            raise RuntimeError('Не удалось получить данные пользователя Яндекса')
 
         return response.json()
 

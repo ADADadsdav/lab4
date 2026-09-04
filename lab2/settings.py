@@ -1,6 +1,8 @@
 import os
+import secrets
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 load_dotenv()
 
@@ -8,10 +10,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 APP_ENV = os.getenv('APP_ENV', os.getenv('NODE_ENV', 'development')).lower()
 
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if APP_ENV == 'production':
+        raise ImproperlyConfigured('SECRET_KEY must be set in production')
+    SECRET_KEY = secrets.token_urlsafe(50)
 
-SECRET_KEY = 'django-insecure-yqm3_=m=%2^2@^7=8r+eu1uvs$u3c(d$%rzi)7skqp8y)4&d20'
-
-DEBUG = APP_ENV != 'production'
+DEBUG = os.getenv('DEBUG', 'true' if APP_ENV != 'production' else 'false').lower() in {'1', 'true', 'yes'}
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'postgres', 'testserver']
 
@@ -37,7 +42,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    #'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -154,6 +159,12 @@ JWT_ACCESS_SECRET = os.getenv('JWT_ACCESS_SECRET')
 JWT_REFRESH_SECRET = os.getenv('JWT_REFRESH_SECRET')
 JWT_ACCESS_EXPIRATION = int(os.getenv('JWT_ACCESS_EXPIRATION', 900))
 JWT_REFRESH_EXPIRATION = int(os.getenv('JWT_REFRESH_EXPIRATION', 604800))
+
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@example.com')
 
 # OAuth Settings
 YANDEX_CLIENT_ID = os.getenv('YANDEX_CLIENT_ID')

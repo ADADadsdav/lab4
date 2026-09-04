@@ -4,11 +4,14 @@ from rest_framework import status
 from django.shortcuts import redirect
 from django.http import JsonResponse
 from django.conf import settings
+import logging
 from .auth_service import AuthService
 from .oauth_service import OAuthService
 from .serializers import RegisterSerializer, LoginSerializer, UserResponseSerializer, ForgotPasswordSerializer, \
     ResetPasswordSerializer
 from .permissions import CookieAuthentication
+
+logger = logging.getLogger(__name__)
 from drf_spectacular.utils import (
     extend_schema,
     OpenApiExample,
@@ -329,8 +332,9 @@ class OAuthYandexCallbackView(APIView):
 
             return response
 
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+        except Exception:
+            logger.exception('Yandex OAuth callback failed')
+            return JsonResponse({'error': 'Не удалось завершить авторизацию через Яндекс'}, status=400)
 
 
 class ForgotPasswordView(APIView):

@@ -1,5 +1,6 @@
 from django.http import HttpResponseNotFound, HttpResponseBadRequest, HttpResponseServerError
 from django.shortcuts import render
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import viewsets, status, pagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -16,6 +17,7 @@ from drf_spectacular.utils import (
 )
 from drf_spectacular.types import OpenApiTypes
 
+@ensure_csrf_cookie
 def index(request):
     movies = Movie.active_objects.all()
     return render(request, "movies/index.html", {"movies": movies})

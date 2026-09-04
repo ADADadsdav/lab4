@@ -1,179 +1,124 @@
+# Movie API — лабораторная работа №4
 
-# Movie API — Лабораторная работа №4
+Автоматизированное документирование REST API с использованием OpenAPI и Swagger UI. Проект продолжает лабораторную работу №3: сохраняет JWT-аутентификацию через Cookies, OAuth 2.0 через Яндекс, CRUD фильмов, пагинацию и Soft Delete.
 
-Система управления фильмами с REST API, аутентификацией через JWT + OAuth2 (Яндекс), мягким удалением и полной документацией.
+## Цель работы
 
-## OpenAPI / Swagger
+- генерировать OpenAPI-документацию автоматически из Python-кода;
+- описывать контроллеры, DTO, параметры, ответы и ошибки;
+- показывать в документации JWT/Cookie и OAuth 2.0 security schemes;
+- использовать Swagger UI для проверки защищённых endpoint-ов;
+- отключать документацию в production.
 
-Документация API генерируется автоматически из Django REST Framework-кода с помощью `drf-spectacular`.
+## OpenAPI и Swagger
+
+Документация генерируется code-first библиотекой `drf-spectacular`. Ручные YAML/JSON-описания API не используются.
+
+В режиме разработки доступны:
 
 - Swagger UI: http://localhost:4200/api/docs/
 - OpenAPI schema: http://localhost:4200/api/schema/
 
-Документация доступна только при `APP_ENV=development`. В production маршруты документации не регистрируются и возвращают 404.
+При `APP_ENV=production` эти маршруты не регистрируются и возвращают `404 Not Found`.
 
-В Swagger UI защищённые методы используют схему `CookieAuth`: сначала выполните `/auth/login`, после чего браузер автоматически отправит HttpOnly cookie. В схеме также описан OAuth 2.0 Authorization Code flow через Яндекс.
-
-Схему можно проверить автоматически:
+Для проверки схемы:
 
 ```bash
 python manage.py spectacular --file schema.yml --validate
 ```
 
-## 🔐 Реализованные механизмы безопасности
+## Что документировано
 
-- **JWT токены**: Access Token (15 мин) и Refresh Token (7 дней)
-- **HttpOnly Cookies**: Токены передаются только через защищённые cookies
-- **Хеширование паролей**: bcrypt с уникальной солью для каждого пользователя
-- **Хранение токенов**: Токены хешируются (SHA-256) перед сохранением в БД
-- **Отзыв токенов**: Возможность logout и logout-all с инвалидацией токенов в БД
-- **OAuth 2.0**: Авторизация через Яндекс (Authorization Code Grant)
-- **CSRF защита**: Параметр state в OAuth, SameSite cookies
-- **Владение ресурсами**: Пользователи могут редактировать/удалять только свои фильмы
-- **Soft Delete**: Мягкое удаление пользователей и фильмов
+- все Auth endpoint-ы: регистрация, login, refresh, whoami, logout, logout-all и сброс пароля;
+- OAuth 2.0 Authorization Code flow через Яндекс;
+- CRUD фильмов: GET, POST, PUT, PATCH и DELETE;
+- группы endpoint-ов `Auth`, `OAuth 2.0` и `Movies`;
+- параметры `page`, `limit` и идентификатор фильма;
+- DTO запросов и ответов с типами и примерами;
+- ответы 200, 201, 204, 400, 401, 403 и 404;
+- схема `CookieAuth` для JWT в HttpOnly cookie `access_token`;
+- схема `YandexOAuth2` с authorization и token URL.
 
-## 🛠 Технологический стек
+## Безопасность приложения
 
-- **Backend:** Python 3.12 + Django 6.0.3
-- **Database:** PostgreSQL 16
-- **ORM:** Django ORM с кастомными менеджерами
-- **API Framework:** Django REST Framework 3.16.1
-- **Аутентификация:** JWT (PyJWT), bcrypt
-- **OAuth:** Ручная реализация Яндекс ID
-- **DevOps:** Docker & Docker Compose
+- bcrypt-пароли с уникальной солью;
+- Access/Refresh Token с индивидуальной солью хеша в БД;
+- HttpOnly и SameSite Cookies;
+- middleware проверки JWT и отзыва токенов;
+- CSRF Middleware Django;
+- OAuth `state` для защиты от CSRF;
+- проверка владельца фильма;
+- Soft Delete;
+- технические ошибки не возвращаются клиенту;
+- секреты находятся в `.env`, а `.env` исключён из Git.
 
-## 📋 API Endpoints
+## API
 
-### Аутентификация
+| Метод | URL | Доступ |
+|---|---|---|
+| POST | `/auth/register` | Public |
+| POST | `/auth/login` | Public, устанавливает Cookies |
+| POST | `/auth/refresh` | Public, нужен Refresh Cookie |
+| GET | `/auth/whoami` | CookieAuth |
+| POST | `/auth/logout` | CookieAuth |
+| POST | `/auth/logout-all` | CookieAuth |
+| GET | `/auth/oauth/yandex` | Public |
+| GET | `/auth/oauth/yandex/callback` | Public |
+| POST | `/auth/forgot-password` | Public |
+| POST | `/auth/reset-password` | Public |
+| GET/POST | `/api/movies/` | CookieAuth |
+| GET/PUT/PATCH/DELETE | `/api/movies/{id}/` | CookieAuth и проверка владельца |
 
-| Метод | URI | Описание | Доступ |
-|-------|-----|----------|--------|
-| POST | `/auth/register` | Регистрация нового пользователя | Public |
-| POST | `/auth/login` | Вход (установка cookies) | Public |
-| POST | `/auth/refresh` | Обновление пары токенов | Public (требуется Refresh Cookie) |
-| GET | `/auth/whoami` | Проверка статуса и данные пользователя | Private |
-| POST | `/auth/logout` | Завершение текущей сессии | Private |
-| POST | `/auth/logout-all` | Завершение всех сессий пользователя | Private |
-| GET | `/auth/oauth/yandex` | Инициация входа через Яндекс | Public |
-| GET | `/auth/oauth/yandex/callback` | Обработка ответа от Яндекса | Public |
-| POST | `/auth/forgot-password` | Запрос на сброс пароля | Public |
-| POST | `/auth/reset-password` | Установка нового пароля | Public |
+## Переменные окружения
 
-### Фильмы (защищены авторизацией)
+Скопируйте `.env.example` в `.env` и укажите:
 
-| Метод | URI | Описание | Доступ |
-|-------|-----|----------|--------|
-| GET | `/api/movies/` | Список фильмов с пагинацией | Private |
-| GET | `/api/movies/{id}/` | Получить фильм по ID | Private (владелец) |
-| POST | `/api/movies/` | Создать новый фильм | Private |
-| PUT | `/api/movies/{id}/` | Полностью обновить фильм | Private (владелец) |
-| PATCH | `/api/movies/{id}/` | Частично обновить фильм | Private (владелец) |
-| DELETE | `/api/movies/{id}/` | Мягкое удаление фильма | Private (владелец) |
+- `SECRET_KEY`;
+- `APP_ENV=development` или `APP_ENV=production`;
+- `JWT_ACCESS_SECRET` и `JWT_REFRESH_SECRET`;
+- параметры PostgreSQL;
+- `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET`, `YANDEX_CALLBACK_URL`.
 
-## 🚀 Быстрый старт
+Файл `.env` не добавляется в репозиторий. В development документация включена, в production должна быть отключена.
 
-### 1. Запуск инфраструктуры
-
-```bash
-docker-compose up -d --build
-```
-
-### 2. Применение миграций
+## Запуск через Docker
 
 ```bash
-docker-compose exec app python manage.py makemigrations
-docker-compose exec app python manage.py migrate
+docker compose up --build
+docker compose exec app python manage.py migrate
 ```
 
-### 3. Доступ к приложению
+Приложение доступно по адресу http://localhost:4200/.
 
-- **API:** http://localhost:4200/api/movies/
-- **Главная страница:** http://localhost:4200/
+Swagger UI открывается по адресу http://localhost:4200/api/docs/.
 
-## 📝 Примеры запросов
+Docker-ресурсы лабораторной изолированы: используются контейнеры `lab4_app`, `lab4_postgres`, отдельная сеть `lab4_network` и отдельный volume базы данных.
 
-### Регистрация пользователя
+## Локальный запуск
 
-```bash
-curl -X POST http://localhost:4200/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "username": "testuser",
-    "password": "SecurePass123",
-    "confirm_password": "SecurePass123"
-  }'
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py runserver
 ```
 
-### Вход в систему
+## Проверка
 
-```bash
-curl -X POST http://localhost:4200/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "identifier": "user@example.com",
-    "password": "SecurePass123"
-  }' \
-  -c cookies.txt
+```powershell
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py spectacular --file schema.yml --validate
+.\.venv\Scripts\python.exe manage.py test
 ```
 
-### Создание фильма (с авторизацией)
+Перед защищёнными запросами в Swagger UI выполните `/auth/login`. Браузер сохранит HttpOnly Cookies, после чего можно проверять `/auth/whoami` и CRUD фильмов. Без авторизации защищённые методы должны возвращать `401`.
 
-```bash
-curl -X POST http://localhost:4200/api/movies/ \
-  -H "Content-Type: application/json" \
-  -b cookies.txt \
-  -d '{
-    "title": "Начало",
-    "director": "Кристофер Нолан",
-    "year": 2010
-  }'
-```
+## Структура
 
-### Проверка статуса авторизации
-
-```bash
-curl -X GET http://localhost:4200/auth/whoami \
-  -b cookies.txt
-```
-
-## 🧪 Тестирование безопасности
-
-1. **Уникальность хешей**: Зарегистрируйте двух пользователей с одинаковым паролем — хеши в БД будут разными
-2. **Защита ресурсов**: Попробуйте получить доступ к `/api/movies/` без cookie — получите 401
-3. **Владение ресурсом**: Пользователь не может удалить/редактировать чужие фильмы
-4. **Истечение токена**: Через 15 минут access token истечёт, но refresh token позволит обновиться
-5. **Logout**: После выхода токены инвалидируются в БД
-6. **OAuth**: Вход через Яндекс работает с проверкой state (защита от CSRF)
-
-## 📂 Структура проекта
-
-```
-lab2/
-├── docker-compose.yml          # Конфигурация Docker
-├── Dockerfile                   # Сборка образа приложения
-├── requirements.txt             # Зависимости Python
-├── manage.py                    # Управление Django проектом
-├── .env                         # Переменные окружения (не в Git!)
-├── custom_auth/                 # Модуль аутентификации
-│   ├── auth_service.py           # Сервис аутентификации
-│   ├── jwt_service.py            # Сервис JWT токенов
-│   ├── oauth_service.py          # OAuth Яндекс
-│   ├── middleware.py             # Промежуточное ПО
-│   ├── serializers.py            # DTO и валидация
-│   ├── views.py                  # Контроллеры
-│   ├── urls.py                   # Маршруты
-│   └── permissions.py            # Разрешения
-├── users/                        # Модуль пользователей
-│   ├── models.py                 # Модели User, UserToken
-│   └── apps.py                   # Конфигурация
-├── movies/                       # Модуль фильмов
-│   ├── models.py                 # Модель Movie с soft delete
-│   ├── views.py                  # API и HTML представления
-│   ├── serializers.py            # Сериализаторы с валидацией
-│   ├── services.py               # Сервисный слой
-│   └── urls.py                   # Маршруты
-└── lab2/                         # Конфигурация Django
-    ├── settings.py               # Настройки
-    └── urls.py                   # Главные маршруты
+```text
+custom_auth/       JWT, Cookies, OAuth, DTO и контроллеры
+users/             User, UserToken и миграции
+movies/            Movie, CRUD, сериализаторы и HTML
+lab2/              настройки Django и маршруты проекта
+manage.py          команды Django
+docker-compose.yml инфраструктура PostgreSQL и приложения
 ```

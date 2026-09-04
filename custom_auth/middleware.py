@@ -32,18 +32,16 @@ class AuthenticationMiddleware(MiddlewareMixin):
 
         # Проверяем, что токен не был отозван (logout должен немедленно
         # прекращать доступ, а не только ждать истечения JWT).
-        token_hash = UserToken.hash_token(access_token)
-        stored_token = UserToken.objects.filter(
-            token_hash=token_hash, token_type='access', is_revoked=False
-        ).first()
-        if not stored_token or not stored_token.is_valid():
-            request.user = None
-            request.user_id = None
-            return None
-
         # Получаем пользователя
         try:
             user = User.objects.get(id=payload['user_id'], deleted_at__isnull=True)
+            stored_token = next((candidate for candidate in UserToken.objects.filter(
+                user=user, token_type='access', is_revoked=False
+            ) if candidate.matches_token(access_token) and candidate.is_valid()), None)
+            if not stored_token:
+                request.user = None
+                request.user_id = None
+                return None
             request.user = user
             request.user_id = user.id
         except User.DoesNotExist:

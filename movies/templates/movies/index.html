@@ -7,15 +7,15 @@
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
+        .yandex-login { display: inline-block; padding: 10px 16px; background: #ffcc00; color: #111; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .yandex-login:hover { background: #f2b900; }
     </style>
 </head>
 <body>
     <div>
     <h3>Аутентификация</h3>
-    <a href="http://localhost:4200/auth/oauth/yandex">
-        <button>
-            Войти через Яндекс ID
-        </button>
+    <a class="yandex-login" href="{% url 'oauth-yandex' %}">
+        Войти через Яндекс ID
     </a>
     </div>
     <h1>Список фильмов</h1>

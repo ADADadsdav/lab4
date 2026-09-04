@@ -5,6 +5,7 @@ from users.models import User, UserToken, PasswordResetToken
 from .jwt_service import JWTService
 from django.db import models
 import secrets
+from django.core.mail import send_mail
 
 
 class AuthService:
@@ -74,13 +75,9 @@ class AuthService:
 
         user_id = payload.get('user_id')
 
-        # Проверяем, не отозван ли токен
-        token_hash = UserToken.hash_token(refresh_token)
-        stored_token = UserToken.objects.filter(
-            token_hash=token_hash,
-            token_type='refresh',
-            is_revoked=False
-        ).first()
+        stored_token = next((candidate for candidate in UserToken.objects.filter(
+            user_id=user_id, token_type='refresh', is_revoked=False
+        ) if candidate.matches_token(refresh_token)), None)
 
         if not stored_token or not stored_token.is_valid():
             raise ValueError('Refresh токен отозван или истек')
@@ -113,21 +110,6 @@ class AuthService:
     def request_password_reset(email: str):
         user = User.active_objects.filter(email=email).first()
         if not user:
-            # Не говорим, что пользователь не найден (безопасность)
-            return
-
-        reset_token = secrets.token_urlsafe(32)
-
-        return reset_token  #
-
-    @staticmethod
-    def reset_password(token: str, new_password: str):
-        pass
-
-    @staticmethod
-    def request_password_reset(email: str):
-        user = User.active_objects.filter(email=email).first()
-        if not user:
             return  # Не раскрываем информацию
 
         # Удаляем старые токены
@@ -135,22 +117,30 @@ class AuthService:
 
         # Создаем новый токен
         token = secrets.token_urlsafe(32)
+        token_salt = secrets.token_hex(16)
         expires_at = timezone.now() + timedelta(hours=1)
         PasswordResetToken.objects.create(
             user=user,
-            token=token,
+            token=PasswordResetToken.hash_token(token, token_salt),
+            token_salt=token_salt,
             expires_at=expires_at
         )
-        # В реальности: отправить email с токеном. Здесь возвращаем для тестов
+
+        send_mail(
+            subject='Сброс пароля',
+            message=f'Используйте токен в /auth/reset-password: {token}',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
         return token
 
     @staticmethod
     def reset_password(token: str, new_password: str):
-        reset_token = PasswordResetToken.objects.filter(
-            token=token,
-            used=False,
-            expires_at__gt=timezone.now()
-        ).first()
+        candidates = PasswordResetToken.objects.filter(
+            used=False, expires_at__gt=timezone.now()
+        )
+        reset_token = next((candidate for candidate in candidates if candidate.matches_token(token)), None)
 
         if not reset_token:
             raise ValueError('Токен сброса недействителен или истек')

@@ -1,5 +1,4 @@
 import jwt
-import hashlib
 import secrets
 from datetime import datetime, timedelta
 from django.conf import settings
@@ -89,11 +88,13 @@ class JWTService:
     @staticmethod
     def save_token(user: User, token: str, token_type: str, expires_at: datetime):
         """Сохранение токена в БД (в хешированном виде)"""
-        token_hash = UserToken.hash_token(token)
+        token_salt = secrets.token_hex(16)
+        token_hash = UserToken.hash_token(token, token_salt)
 
         UserToken.objects.create(
             user=user,
             token_hash=token_hash,
+            token_salt=token_salt,
             token_type=token_type,
             expires_at=expires_at
         )
@@ -101,17 +102,22 @@ class JWTService:
     @staticmethod
     def revoke_token(token: str):
         """Отзыв токена"""
-        token_hash = UserToken.hash_token(token)
+        payload = JWTService.verify_access_token(token)
+        token_type = 'access'
+        if not payload:
+            payload = JWTService.verify_refresh_token(token)
+            token_type = 'refresh'
+        if not payload:
+            return
 
-        # Пытаемся найти и отозвать токен
-        user_token = UserToken.objects.filter(
-            token_hash=token_hash,
-            is_revoked=False
-        ).first()
-
-        if user_token:
-            user_token.is_revoked = True
-            user_token.save()
+        candidates = UserToken.objects.filter(
+            user_id=payload.get('user_id'), token_type=token_type, is_revoked=False
+        )
+        for user_token in candidates:
+            if user_token.matches_token(token):
+                user_token.is_revoked = True
+                user_token.save(update_fields=['is_revoked'])
+                return
 
     @staticmethod
     def revoke_all_user_tokens(user: User):

@@ -3,6 +3,8 @@ from django.utils import timezone
 import bcrypt
 import os
 import secrets
+import hashlib
+import hmac
 
 
 class UserManager(models.Manager):
@@ -89,6 +91,7 @@ class UserToken(models.Model):
     """Модель для хранения токенов"""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tokens')
     token_hash = models.CharField(max_length=128)  # Хеш токена
+    token_salt = models.CharField(max_length=32, null=True, blank=True)
     token_type = models.CharField(max_length=20, choices=[('access', 'Access'), ('refresh', 'Refresh')])
     expires_at = models.DateTimeField()
     is_revoked = models.BooleanField(default=False)
@@ -106,15 +109,30 @@ class UserToken(models.Model):
         return not self.is_revoked and self.expires_at > timezone.now()
 
     @staticmethod
-    def hash_token(token: str) -> str:
-        """Хеширование токена для хранения в БД"""
-        import hashlib
-        return hashlib.sha256(token.encode('utf-8')).hexdigest()
+    def hash_token(token: str, salt: str) -> str:
+        """Хеширование токена с уникальной солью для хранения в БД."""
+        return hashlib.sha256(f'{salt}:{token}'.encode('utf-8')).hexdigest()
+
+    def matches_token(self, token: str) -> bool:
+        if self.token_salt:
+            expected = self.hash_token(token, self.token_salt)
+        else:
+            expected = hashlib.sha256(token.encode('utf-8')).hexdigest()
+        return hmac.compare_digest(self.token_hash, expected)
 
 
 class PasswordResetToken(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     token = models.CharField(max_length=64, unique=True)
+    token_salt = models.CharField(max_length=32, null=True, blank=True)
     expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @staticmethod
+    def hash_token(token: str, salt: str) -> str:
+        return hashlib.sha256(f'{salt}:{token}'.encode('utf-8')).hexdigest()
+
+    def matches_token(self, token: str) -> bool:
+        expected = self.hash_token(token, self.token_salt) if self.token_salt else self.token
+        return hmac.compare_digest(self.token, expected)
