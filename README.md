@@ -1,7 +1,24 @@
 
-# Movie API — Лабораторная работа №3
+# Movie API — Лабораторная работа №4
 
 Система управления фильмами с REST API, аутентификацией через JWT + OAuth2 (Яндекс), мягким удалением и полной документацией.
+
+## OpenAPI / Swagger
+
+Документация API генерируется автоматически из Django REST Framework-кода с помощью `drf-spectacular`.
+
+- Swagger UI: http://localhost:4200/api/docs/
+- OpenAPI schema: http://localhost:4200/api/schema/
+
+Документация доступна только при `APP_ENV=development`. В production маршруты документации не регистрируются и возвращают 404.
+
+В Swagger UI защищённые методы используют схему `CookieAuth`: сначала выполните `/auth/login`, после чего браузер автоматически отправит HttpOnly cookie. В схеме также описан OAuth 2.0 Authorization Code flow через Яндекс.
+
+Схему можно проверить автоматически:
+
+```bash
+python manage.py spectacular --file schema.yml --validate
+```
 
 ## 🔐 Реализованные механизмы безопасности
 

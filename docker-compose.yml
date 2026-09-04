@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16
-    container_name: wp_labs_db
+    container_name: lab4_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -10,9 +10,9 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - lab4_postgres_data:/var/lib/postgresql/data
     networks:
-      - wp_labs_network
+      - lab4_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
@@ -21,7 +21,7 @@ services:
 
   app:
     build: .
-    container_name: wp_labs_app
+    container_name: lab4_app
     restart: unless-stopped
     environment:
       DB_HOST: postgres
@@ -36,16 +36,17 @@ services:
       YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID}
       YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET}
       YANDEX_CALLBACK_URL: ${YANDEX_CALLBACK_URL}
+      APP_ENV: ${APP_ENV:-development}
     ports:
       - "4200:8000"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - wp_labs_network
+      - lab4_network
 
 volumes:
-  postgres_data:
+  lab4_postgres_data:
 
 networks:
-  wp_labs_network:
+  lab4_network:

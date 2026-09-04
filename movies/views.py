@@ -7,6 +7,14 @@ from .models import Movie
 from .serializers import *
 from .services import MovieService
 from custom_auth.permissions import IsCookieAuthenticated, CookieAuthentication
+from custom_auth.serializers import ErrorResponseSerializer
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+    OpenApiResponse,
+)
+from drf_spectacular.types import OpenApiTypes
 
 def index(request):
     movies = Movie.active_objects.all()
@@ -58,6 +66,92 @@ class CustomPagination(pagination.PageNumberPagination):
             }
         })
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=['Movies'],
+        summary='List active movies',
+        description='Returns the authenticated user\'s active movies with pagination.',
+        auth=[{'CookieAuth': []}],
+        parameters=[
+            OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, required=False, description='Page number, starting at 1.'),
+            OpenApiParameter('limit', OpenApiTypes.INT, OpenApiParameter.QUERY, required=False, description='Items per page from 1 to 100.'),
+        ],
+        responses={
+            200: MovieListResponseSerializer,
+            400: OpenApiResponse(response=ErrorResponseSerializer, description='Invalid pagination parameters.'),
+            401: ErrorResponseSerializer,
+        },
+    ),
+    retrieve=extend_schema(
+        tags=['Movies'],
+        summary='Get a movie',
+        description='Returns one active movie owned by the authenticated user.',
+        auth=[{'CookieAuth': []}],
+        parameters=[OpenApiParameter('id', OpenApiTypes.INT, OpenApiParameter.PATH, description='Movie identifier.')],
+        responses={
+            200: MovieOutputSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    create=extend_schema(
+        tags=['Movies'],
+        summary='Create a movie',
+        description='Creates a movie owned by the authenticated user.',
+        auth=[{'CookieAuth': []}],
+        request=MovieCreateSerializer,
+        responses={
+            201: MovieOutputSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    update=extend_schema(
+        tags=['Movies'],
+        summary='Replace a movie',
+        description='Replaces all editable fields of an owned movie.',
+        auth=[{'CookieAuth': []}],
+        parameters=[OpenApiParameter('id', OpenApiTypes.INT, OpenApiParameter.PATH, description='Movie identifier.')],
+        request=MovieUpdateSerializer,
+        responses={
+            200: MovieOutputSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    partial_update=extend_schema(
+        tags=['Movies'],
+        summary='Partially update a movie',
+        description='Updates any subset of editable fields of an owned movie.',
+        auth=[{'CookieAuth': []}],
+        parameters=[OpenApiParameter('id', OpenApiTypes.INT, OpenApiParameter.PATH, description='Movie identifier.')],
+        request=MoviePatchSerializer,
+        responses={
+            200: MovieOutputSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    destroy=extend_schema(
+        tags=['Movies'],
+        summary='Soft-delete a movie',
+        description='Marks an owned movie as deleted without physically removing it from the database.',
+        auth=[{'CookieAuth': []}],
+        parameters=[OpenApiParameter('id', OpenApiTypes.INT, OpenApiParameter.PATH, description='Movie identifier.')],
+        request=None,
+        responses={
+            204: OpenApiResponse(description='Movie successfully soft-deleted.'),
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+)
 class MovieViewSet(viewsets.ViewSet):
     """
     GET    /api/movies/          - список с пагинацией

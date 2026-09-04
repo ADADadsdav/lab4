@@ -9,11 +9,40 @@ from .oauth_service import OAuthService
 from .serializers import RegisterSerializer, LoginSerializer, UserResponseSerializer, ForgotPasswordSerializer, \
     ResetPasswordSerializer
 from .permissions import CookieAuthentication
+from drf_spectacular.utils import (
+    extend_schema,
+    OpenApiExample,
+    OpenApiParameter,
+    OpenApiResponse,
+)
+from drf_spectacular.types import OpenApiTypes
+from .serializers import (
+    ErrorResponseSerializer,
+    LoginResponseSerializer,
+    MessageResponseSerializer,
+)
 
 
 class RegisterView(APIView):
     permission_classes = []
 
+    @extend_schema(
+        tags=['Auth'],
+        summary='Register a user',
+        description='Create a user account. Password fields are write-only and never returned.',
+        auth=[],
+        request=RegisterSerializer,
+        responses={
+            201: UserResponseSerializer,
+            400: OpenApiResponse(response=ErrorResponseSerializer, description='Validation error.'),
+        },
+        examples=[OpenApiExample(
+            'Successful registration',
+            value={'id': 1, 'username': 'testuser', 'email': 'user@example.com', 'created_at': '2026-09-04T12:00:00Z'},
+            response_only=True,
+            status_codes=['201'],
+        )],
+    )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
@@ -35,6 +64,24 @@ class LoginView(APIView):
     """Вход пользователя"""
     permission_classes = []
 
+    @extend_schema(
+        tags=['Auth'],
+        summary='Login and set JWT cookies',
+        description='Authenticates by email, phone or username and sets HttpOnly access_token and refresh_token cookies.',
+        auth=[],
+        request=LoginSerializer,
+        responses={
+            200: LoginResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: OpenApiResponse(response=ErrorResponseSerializer, description='Invalid credentials.'),
+        },
+        examples=[OpenApiExample(
+            'Successful login',
+            value={'user': {'id': 1, 'username': 'testuser', 'email': 'user@example.com', 'created_at': '2026-09-04T12:00:00Z'}},
+            response_only=True,
+            status_codes=['200'],
+        )],
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
 
@@ -79,6 +126,18 @@ class RefreshTokenView(APIView):
     """Обновление токенов"""
     permission_classes = []
 
+    @extend_schema(
+        tags=['Auth'],
+        summary='Refresh JWT cookies',
+        description='Reads refresh_token from the HttpOnly cookie and issues a new access/refresh cookie pair.',
+        auth=[],
+        request=None,
+        responses={
+            200: LoginResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    )
     def post(self, request):
         refresh_token = request.COOKIES.get('refresh_token')
 
@@ -119,6 +178,13 @@ class RefreshTokenView(APIView):
 class WhoAmIView(APIView):
     """Получение информации о текущем пользователе"""
 
+    @extend_schema(
+        tags=['Auth'],
+        summary='Get the current user',
+        description='Returns the user resolved from the access_token cookie.',
+        auth=[{'CookieAuth': []}],
+        responses={200: UserResponseSerializer, 401: ErrorResponseSerializer},
+    )
     def get(self, request):
         if not getattr(request.user, 'is_authenticated', False):
             return Response({'error': 'Не авторизован'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -129,6 +195,14 @@ class WhoAmIView(APIView):
 class LogoutView(APIView):
     """Выход из текущей сессии"""
 
+    @extend_schema(
+        tags=['Auth'],
+        summary='Logout the current session',
+        description='Revokes the current JWT pair and clears both cookies.',
+        auth=[{'CookieAuth': []}],
+        request=None,
+        responses={200: MessageResponseSerializer, 401: ErrorResponseSerializer},
+    )
     def post(self, request):
         access_token = request.COOKIES.get('access_token')
         refresh_token = request.COOKIES.get('refresh_token')
@@ -151,6 +225,14 @@ class LogoutView(APIView):
 class LogoutAllView(APIView):
     """Выход из всех сессий"""
 
+    @extend_schema(
+        tags=['Auth'],
+        summary='Logout all sessions',
+        description='Revokes all active sessions for the authenticated user and clears cookies.',
+        auth=[{'CookieAuth': []}],
+        request=None,
+        responses={200: MessageResponseSerializer, 401: ErrorResponseSerializer},
+    )
     def post(self, request):
         if not getattr(request.user, 'is_authenticated', False):
             return Response({'error': 'Не авторизован'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -168,6 +250,13 @@ class OAuthYandexView(APIView):
     """Инициация OAuth через Yandex"""
     permission_classes = []
 
+    @extend_schema(
+        tags=['OAuth 2.0'],
+        summary='Start Yandex OAuth 2.0 authorization',
+        description='Starts the Authorization Code Grant flow and redirects the browser to Yandex.',
+        auth=[],
+        responses={302: OpenApiResponse(description='Redirect to the Yandex authorization page.')},
+    )
     def get(self, request):
         auth_url, state = OAuthService.get_yandex_auth_url()
 
@@ -181,6 +270,21 @@ class OAuthYandexCallbackView(APIView):
     """Callback для OAuth Yandex"""
     permission_classes = []
 
+    @extend_schema(
+        tags=['OAuth 2.0'],
+        summary='Handle Yandex OAuth callback',
+        description='Validates the OAuth state, exchanges the authorization code and sets JWT cookies.',
+        auth=[],
+        parameters=[
+            OpenApiParameter('code', OpenApiTypes.STR, OpenApiParameter.QUERY, required=False, description='Authorization code from Yandex.'),
+            OpenApiParameter('state', OpenApiTypes.STR, OpenApiParameter.QUERY, required=False, description='CSRF state value.'),
+            OpenApiParameter('error', OpenApiTypes.STR, OpenApiParameter.QUERY, required=False, description='OAuth provider error.'),
+        ],
+        responses={
+            302: OpenApiResponse(description='Redirect to the frontend after successful authorization.'),
+            400: ErrorResponseSerializer,
+        },
+    )
     def get(self, request):
         code = request.GET.get('code')
         state = request.GET.get('state')
@@ -232,6 +336,14 @@ class OAuthYandexCallbackView(APIView):
 class ForgotPasswordView(APIView):
     permission_classes = []
 
+    @extend_schema(
+        tags=['Auth'],
+        summary='Request password reset',
+        description='Requests a password-reset email without revealing whether the address exists.',
+        auth=[],
+        request=ForgotPasswordSerializer,
+        responses={200: MessageResponseSerializer, 400: ErrorResponseSerializer},
+    )
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
         if not serializer.is_valid():
@@ -248,6 +360,14 @@ class ForgotPasswordView(APIView):
 class ResetPasswordView(APIView):
     permission_classes = []
 
+    @extend_schema(
+        tags=['Auth'],
+        summary='Reset a password',
+        description='Replaces the password using a valid reset token. Passwords are never returned.',
+        auth=[],
+        request=ResetPasswordSerializer,
+        responses={200: MessageResponseSerializer, 400: ErrorResponseSerializer},
+    )
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data)
         if not serializer.is_valid():

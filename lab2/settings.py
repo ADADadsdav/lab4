@@ -6,10 +6,12 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+APP_ENV = os.getenv('APP_ENV', os.getenv('NODE_ENV', 'development')).lower()
+
 
 SECRET_KEY = 'django-insecure-yqm3_=m=%2^2@^7=8r+eu1uvs$u3c(d$%rzi)7skqp8y)4&d20'
 
-DEBUG = True
+DEBUG = APP_ENV != 'production'
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'postgres', 'testserver']
 
@@ -27,6 +29,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'custom_auth.apps.CustomAuthConfig',
     'rest_framework',
+    'drf_spectacular',
 ]
 AUTH_USER_MODEL = 'users.User'
 
@@ -105,9 +108,47 @@ AUTH_PASSWORD_VALIDATORS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['custom_auth.permissions.CookieAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
     'EXCEPTION_HANDLER': 'custom_auth.exceptions.custom_exception_handler',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Movie API',
+    'DESCRIPTION': (
+        'REST API лабораторных работ №2–4: аутентификация JWT в HttpOnly Cookies, '
+        'CRUD фильмов, OAuth 2.0 через Яндекс и мягкое удаление.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'CookieAuth': {
+                'type': 'apiKey',
+                'in': 'cookie',
+                'name': 'access_token',
+                'description': 'JWT access token in the HttpOnly access_token cookie.',
+            },
+            'YandexOAuth2': {
+                'type': 'oauth2',
+                'description': 'OAuth 2.0 Authorization Code flow через Яндекс.',
+                'flows': {
+                    'authorizationCode': {
+                        'authorizationUrl': 'https://oauth.yandex.ru/authorize',
+                        'tokenUrl': 'https://oauth.yandex.ru/token',
+                        'scopes': {'login:info': 'Получение информации о пользователе'},
+                    }
+                },
+            }
+        }
+    },
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayRequestDuration': True,
+    },
 }
 JWT_ACCESS_SECRET = os.getenv('JWT_ACCESS_SECRET')
 JWT_REFRESH_SECRET = os.getenv('JWT_REFRESH_SECRET')

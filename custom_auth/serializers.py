@@ -1,8 +1,21 @@
 from rest_framework import serializers
 from users.models import User
+from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 import re
 
 
+@extend_schema_serializer(
+    examples=[OpenApiExample(
+        'Registration request',
+        value={
+            'email': 'user@example.com',
+            'username': 'testuser',
+            'password': 'SecurePass123',
+            'confirm_password': 'SecurePass123',
+        },
+        request_only=True,
+    )]
+)
 class RegisterSerializer(serializers.Serializer):
     """Сериализатор для регистрации"""
     email = serializers.EmailField(required=False)  # Теперь необязательно
@@ -57,11 +70,30 @@ class RegisterSerializer(serializers.Serializer):
 
         return data
 
+@extend_schema_serializer(
+    examples=[OpenApiExample(
+        'Login request',
+        value={'identifier': 'user@example.com', 'password': 'SecurePass123'},
+        request_only=True,
+    )]
+)
 class LoginSerializer(serializers.Serializer):
     """Сериализатор для входа (email, телефон или username)"""
     identifier = serializers.CharField(required=True)
     password = serializers.CharField(write_only=True, required=True)
 
+@extend_schema_serializer(
+    examples=[OpenApiExample(
+        'User response',
+        value={
+            'id': 1,
+            'username': 'testuser',
+            'email': 'user@example.com',
+            'created_at': '2026-09-04T12:00:00Z',
+        },
+        response_only=True,
+    )]
+)
 class UserResponseSerializer(serializers.ModelSerializer):
     """Сериализатор для ответа с данными пользователя"""
 
@@ -69,6 +101,21 @@ class UserResponseSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'created_at']
         read_only_fields = fields
+
+
+class LoginResponseSerializer(serializers.Serializer):
+    """Response returned after login or refresh; tokens remain in cookies."""
+
+    user = UserResponseSerializer(read_only=True)
+
+
+class MessageResponseSerializer(serializers.Serializer):
+    message = serializers.CharField(read_only=True)
+
+
+class ErrorResponseSerializer(serializers.Serializer):
+    error = serializers.CharField(required=False)
+    errors = serializers.DictField(required=False)
 
 
 class ForgotPasswordSerializer(serializers.Serializer):
