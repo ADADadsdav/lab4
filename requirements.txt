@@ -1,0 +1,7 @@
+Django==6.0.3
+djangorestframework==3.16.1
+psycopg2-binary==2.9.11
+python-dotenv==1.0.1
+PyJWT>=2.8
+bcrypt>=4.0
+requests>=2.31

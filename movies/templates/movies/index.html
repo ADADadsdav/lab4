@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Фильмы</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div>
+    <h3>Аутентификация</h3>
+    <a href="http://localhost:4200/auth/oauth/yandex">
+        <button>
+            Войти через Яндекс ID
+        </button>
+    </a>
+    </div>
+    <h1>Список фильмов</h1>
+
+    <h2>API Endpoints:</h2>
+    <ul>
+        <li>GET /api/movies/ - список фильмов (с пагинацией)</li>
+        <li>GET /api/movies/{id}/ - получить фильм по ID</li>
+        <li>POST /api/movies/ - создать фильм</li>
+        <li>PUT /api/movies/{id}/ - обновить фильм</li>
+        <li>PATCH /api/movies/{id}/ - частично обновить</li>
+        <li>DELETE /api/movies/{id}/ - удалить фильм</li>
+    </ul>
+
+    <h2>Фильмы в базе:</h2>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Название</th>
+            <th>Режиссер</th>
+            <th>Год</th>
+            <th>Дата создания</th>
+            <th>Статус</th>
+        </tr>
+        {% for movie in movies %}
+        <tr>
+            <td>{{ movie.id }}</td>
+            <td>{{ movie.title }}</td>
+            <td>{{ movie.director }}</td>
+            <td>{{ movie.year }}</td>
+            <td>{{ movie.created_at }}</td>
+            <td>{% if movie.deleted_at %}Удален{% else %}Активен{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
